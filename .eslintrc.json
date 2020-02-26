@@ -17,7 +17,11 @@
   },
   "plugins": ["react", "prettier"],
   "rules": {
-    "react/js-filename-extension": ["error", { "extensions": [".js", ".jsx"] }],
-    "import/pefer-default-export": "off"
+    "react/jsx-filename-extension": [
+      "error",
+      { "extensions": [".js", ".jsx"] }
+    ],
+    "import/pefer-default-export": "off",
+    "react/jsx-one-expression-per-line": "off"
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 /* eslint-disable react/jsx-props-no-spreading */
 import React, { useState, useMemo, useCallback } from 'react';
 import { createEditor, Transforms, Editor } from 'slate';
@@ -30,9 +31,22 @@ const CustomEditor = {
     });
     return !!match;
   },
+  isUnderlinecMarkActive(editor) {
+    const [match] = Editor.nodes(editor, {
+      match: n => n.underline === true,
+      universal: true,
+    });
+    return !!match;
+  },
   isCodeBlockActive(editor) {
     const [match] = Editor.nodes(editor, {
       match: n => n.type === 'code',
+    });
+    return !!match;
+  },
+  isUlBlockActive(editor) {
+    const [match] = Editor.nodes(editor, {
+      match: n => n.type === 'list',
     });
     return !!match;
   },
@@ -52,11 +66,27 @@ const CustomEditor = {
       { match: n => new Text(n), split: true }
     );
   },
+  toggleUnderlineMark(editor) {
+    const isActive = CustomEditor.isUnderlinecMarkActive(editor);
+    Transforms.setNodes(
+      editor,
+      { underline: isActive ? null : true },
+      { match: n => new Text(n), split: true }
+    );
+  },
   toggleCodeBlock(editor) {
     const isActive = CustomEditor.isCodeBlockActive(editor);
     Transforms.setNodes(
       editor,
       { type: isActive ? null : 'code' },
+      { match: n => Editor.isBlock(editor, n) }
+    );
+  },
+  toggleUlBlock(editor) {
+    const isActive = CustomEditor.isUlBlockActive(editor);
+    Transforms.setNodes(
+      editor,
+      { type: isActive ? null : 'list' },
       { match: n => Editor.isBlock(editor, n) }
     );
   },
@@ -81,13 +111,14 @@ function App() {
     switch (element.type) {
       case 'code':
         return <CodeElement {...props} />;
+      case 'list':
+        return <UlElement {...props} />;
       default:
         return <DefaultElement {...props} />;
     }
   }, []);
 
   const renderLeaf = useCallback(props => {
-    console.log(props.leaf);
     return <Leaf {...props} />;
   }, []);
 
@@ -125,7 +156,7 @@ function App() {
             className="tooltip-icon-button"
             onPointerDown={event => {
               event.preventDefault();
-              // CustomEditor.toggleItalicMark(editor);
+              CustomEditor.toggleCodeBlock(editor);
             }}
           >
             <Icon icon={code} />
@@ -135,7 +166,7 @@ function App() {
             className="tooltip-icon-button"
             onPointerDown={event => {
               event.preventDefault();
-              // CustomEditor.toggleItalicMark(editor);
+              CustomEditor.toggleUlBlock(editor);
             }}
           >
             <Icon icon={list} />
@@ -145,7 +176,7 @@ function App() {
             className="tooltip-icon-button"
             onPointerDown={event => {
               event.preventDefault();
-              // CustomEditor.toggleItalicMark(editor);
+              CustomEditor.toggleUnderlineMark(editor);
             }}
           >
             <Icon icon={underline} />
@@ -155,7 +186,7 @@ function App() {
           style={{ textAlign: 'left' }}
           renderElement={renderElement}
           renderLeaf={renderLeaf}
-          onKeyDown={(event, change) => {
+          onKeyDown={event => {
             if (!event.ctrlKey) return;
 
             // Replace the `onKeyDown` logic with our new commands.
@@ -178,6 +209,18 @@ function App() {
                 break;
               }
 
+              case 'u': {
+                event.preventDefault();
+                CustomEditor.toggleUnderlineMark(editor);
+                break;
+              }
+
+              case 'l': {
+                event.preventDefault();
+                CustomEditor.toggleUlBlock(editor);
+                break;
+              }
+
               default:
             }
           }}
@@ -195,63 +238,92 @@ const CodeElement = ({ attributes, children }) => {
   );
 };
 
+const UlElement = ({ attributes, children }) => {
+  return (
+    <ul {...attributes}>
+      <li>{children}</li>
+    </ul>
+  );
+};
+
 const DefaultElement = ({ attributes, children }) => (
   <p {...attributes}>{children}</p>
 );
 
 // define a react component to render leaves with bold and italic text
 const Leaf = ({ attributes, children, leaf }) => {
- if(leaf.bold && !leaf.italic) {
-   return (
-     <span {...attributes} style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}>
-       {children}
-     </span>
-   );
- }
- if(leaf.bold && leaf.italic) {
-  return (
-    <em>
-      <span {...attributes} style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}>
+  if (leaf.bold && !leaf.italic) {
+    return (
+      <span
+        {...attributes}
+        style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}
+      >
         {children}
       </span>
-    </em>
+    );
+  }
+  if (leaf.bold && leaf.italic) {
+    return (
+      <em>
+        <span
+          {...attributes}
+          style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}
+        >
+          {children}
+        </span>
+      </em>
+    );
+  }
+
+  if (leaf.bold && leaf.italic && leaf.underline) {
+    return (
+      <u>
+        <em>
+          <span
+            {...attributes}
+            style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}
+          >
+            {children}
+          </span>
+        </em>
+      </u>
+    );
+  }
+
+  if (leaf.bold && !leaf.italic && leaf.underline) {
+    return (
+      <u>
+        <span
+          {...attributes}
+          style={{ fontWeight: leaf.bold ? 'bold' : 'normal' }}
+        >
+          {children}
+        </span>
+      </u>
+    );
+  }
+
+  if (!leaf.bold && leaf.italic && leaf.underline) {
+    return (
+      <u>
+        <em {...attributes}>{children}</em>
+      </u>
+    );
+  }
+
+  if (leaf.italic && !leaf.bold) {
+    return <em {...attributes}>{children}</em>;
+  }
+
+  if (leaf.underline && !leaf.bold && !leaf.italic) {
+    return <u {...attributes}>{children}</u>;
+  }
+
+  return (
+    <span {...attributes} style={{ fontWeight: 'normal' }}>
+      {children}
+    </span>
   );
- }
- if(leaf.italic && !leaf.bold){
-   return (
-     <em {...attributes}>
-       {children}
-     </em>
-   );
- }
+};
 
-
- return (
-   <span {...attributes} style={{ fontWeight: 'normal' }}>
-     {children}
-   </span>
- );
-}
-
-/* App.propTypes = {
-  element: PropTypes.shape({
-    type: PropTypes.string,
-  }).isRequired,
-};
-DefaultElement.propTypes = {
-  attributes: PropTypes.element.isRequired,
-  children: PropTypes.element.isRequired,
-};
-Leaf.propTypes = {
-  attributes: PropTypes.element.isRequired,
-  children: PropTypes.element.isRequired,
-  leaf: PropTypes.shape({
-    bold: PropTypes.string,
-  }).isRequired,
-};
-CodeElement.propTypes = {
-  attributes: PropTypes.element.isRequired,
-  children: PropTypes.element.isRequired,
-};
- */
 export default App;
